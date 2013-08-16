@@ -95,7 +95,7 @@ def checkDate(values):
         time.strptime(v[0:10], "%Y-%m-%d") 
 
 def checkStandardName(values):
-    raise NotImplementedError
+    print '%%W: Checking for valid standard names not implemented (%s,%s)'%(values[0],values[1])
 
 def checkHeight(values):
     checkfloat(values[0])
@@ -632,8 +632,10 @@ class BADCtfMetadata:
                     val.append(value)
 
             for label, column, value in self.varRecords:
-                if lab == label and (col==column or col=='*'):
+                if (lab == label) and (col==column or col=='*'):
                     val.append(value) 
+                elif (lab =='*') and (col==column):
+                    val.append((label,value))
         else:
             lab = i
             for label, value in self.globalRecords:
@@ -698,6 +700,43 @@ class BADCtfMetadata:
         csvwriter = csv.writer(s, lineterminator='\n' )
         self.csv(csvwriter)
         return s.getvalue()
+        
+
+def makeBadDummy():
+    ''' Makes an incomplete invalid badc text file instance, for testing '''
+    t = BADCtf()
+    d1 = (301.2, 303.4, 305.6, 305.2)
+    d2 = (1002.2, 1004.4, 1005.7, 1015.2)
+    d3 = (6,12,18,24)
+    
+    t.add_variable("temp",d1)
+    t.add_variable("press",d2)
+    t.add_variable('time',d3)
+    t.add_metadata('creator', 'Scrofulous Student')
+    t.add_metadata('creator', ('Prof Bigshot, Hogwarts Uni'))
+    return t
+    
+def makeBasicDummy():
+    ''' Makes a complete, valid, basic badc text file instance for testing'''
+    t=makeBadDummy()
+    # following are mandatory basic column metadata
+    t.add_metadata('long_name',('Temperature','K'),'temp')
+    t.add_metadata('long_name',('Pressure','hPa'),'press')
+    t.add_metadata('long_name',('Time since zero hours on valid date','hours'),'time')
+    t.add_metadata('type','float','temp')
+    t.add_metadata('type','float','press')
+    t.add_metadata('type','int','time')
+    t.add_metadata('coordinate_variable','1','time')
+    # following are basic mandatory file metadata
+    t.add_metadata('date_valid','2013-12-01')
+    t.add_metadata('feature_type','point series')
+    t.add_metadata('observation_station','My back yard')
+    t.add_metadata('location','My back yard')
+    t.add_metadata('activity','testing BADCtf')
+    t.add_metadata('source','My Dummy data program')
+    now = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+    t.add_metadata('last_revised_date',now)
+    return t 
             
         
 class testBADCtf(unittest.TestCase):
@@ -706,52 +745,18 @@ class testBADCtf(unittest.TestCase):
     dummycsv='xxxx.csv'
     dummycdl='xxxx.cdl'
     dummyna='xxxx.na'
-    
-    
-    def _makeBadDummy1(self):
-        ''' Makes some dummy data '''
-        t = BADCtf()
-        d1 = (301.2, 303.4, 305.6, 305.2)
-        d2 = (1002.2, 1004.4, 1005.7, 1015.2)
-        d3 = (6,12,18,24)
-    
-        t.add_variable("temp",d1)
-        t.add_variable("press",d2)
-        t.add_variable('time',d3)
-        t.add_metadata('creator', 'Dummy Tester')
-        t.add_metadata('creator', ('Prof Bigshot', 'Hogwarts Uni'))
-        return t
-        
-    def _makeBasic(self):
-        t=self._makeBadDummy1()
-        # following are mandatory basic column metadata
-        t.add_metadata('long_name',('Temperature','K'),'temp')
-        t.add_metadata('long_name',('Pressure','hPa'),'press')
-        t.add_metadata('long_name',('Time since zero hours on valid date','hours'),'time')
-        t.add_metadata('type','float','temp')
-        t.add_metadata('type','float','press')
-        t.add_metadata('type','int','time')
-        t.add_metadata('coordinate_variable','1','time')
-        # following are basic mandatory file metadata
-        t.add_metadata('date_valid','2013-12-01')
-        t.add_metadata('feature_type','point series')
-        t.add_metadata('observation_station','My back yard')
-        t.add_metadata('location','My back yard')
-        t.add_metadata('activity','testing BADCtf')
-        t.add_metadata('source','My Dummy data program')
-        now = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
-        t.add_metadata('last_revised_date',now)
-        return t 
-    
+    sample="badc-csv-full-example2.csv"
+
+
     def _makeDummy(self):
         ''' Makes some dummy data '''
-        t=self._makeBasic()
+        t=makeBasicDummy()
         return t
         
     def setUp(self):
         self.t=self._makeDummy()
         
-    def cleanUp(self):
+    def tearDown(self):
         for f in [self.dummycsv,self.dummycdl,self.dummyna]:
             if os.path.exists(f): os.remove(f)
         
@@ -766,7 +771,7 @@ class testBADCtf(unittest.TestCase):
         
     def testMakeAndCheckBasicFails(self):
         ''' Test basic valid checking '''
-        self.t2=self._makeBadDummy1()
+        self.t2=makeBadDummy()
         self.assertRaises(BADCtfMetadataIncomplete,self.t2._check_complete,('basic',))
         
     def testMakeAndCheckBasic(self):
@@ -801,7 +806,11 @@ class testBADCtf(unittest.TestCase):
         t2.add_metadata('creator','another author')
         self.assertNotEqual(t1._metadata,t2._metadata)
         
-        
+    def testReadingExample(self):
+        print '\n%I: Some warnings expected wrt checking standard names'
+        t=BADCtf('r',self.sample)
+        self.assertEqual(t.nvar(),35)
+       
 
 if __name__ == "__main__":
     unittest.main()

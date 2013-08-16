@@ -4,100 +4,105 @@ from BADCtf import BADCtf,makeBasicDummy
 
 import unittest, uuid, os 
 
-class btncf(netcdf_file):
-    ''' A netcdf object with badc text file read write methods as well as nc write'''
-    def __init__(self,mode,filename):
-        ''' Instantiate as r or w, with filename. If the filename extension is
-        .nc, netcdf I/O will be used, if .csv, badc text file I/O will be used. 
-        '''
-        fext=os.path.splitext(filename)[-1]
-        if fext not in ['.nc','.csv']:
-            raise ValueError('Unknown filetype for btncf - %s'%fext)
-        if fext == '.csv':
-            # get a dummy netcdf filename
-            cachefile=str(uuid.uuid4())+'.nc'
-            netcdf_file.__init__(self,cachefile,'w')
-            if mode=='r':
-                self.badctf=BADCtf('r',filename)
-                self.__unpacktf()
-        elif fext == 'nc':
-            netcdf_file.__init__(self,mode,filename)
-            self.badctf=None
-            
-        self.filetype=fext
-        self.mode=mode
-            
-    def __unpacktf(self):
-        ''' Used to unpack a BADCtf into this netcdf_file instance '''
-        assert self.badctf is not None
-        # file global attributes
-        for a in self.badctf._metadata.globalRecords:
-            if len(a)==2:
-                setattr(self,a[0],a[1])
-            else: setattr(self,a[0],a[1:])
-        fvars={}
-        # first get attributes into useful dictionary
-        for v in self.badctf.colnames():
-            attrs=self.badctf._metadata[('*',v)]
-            adict={}
-            for a in self.badctf._metadata[('*',v)]:
-                adict[a[0]]=a[1]
-            fvars[v]=adict
-        # now load up the coordinate variables first
-        index=-1
-        dimensions=[]
-        # we do this loop first fora future with multiple coordinate 
-        # variables
-        for v in self.badctf.colnames():
-            index+=1
-            if 'coordinate_variable' in fvars[v]:
-                data=self.badctf[index]
-                dlen=len(data)
-                dim=self.createDimension(v,dlen)
-                dimdata=self.createVariable(v,fvars[v]['type'][0],(v,))
-                dimdata[:]=data
-                dimensions.append(v)
-        # now the assumption with a badc text file is that there is
-        # only one coordinate variable.
-        assert len(dimensions) == 1, "Code doesn't support multiple coordinate variables"
-        index=-1
-        for v in self.badctf.colnames():
-            index+=1
-            if 'coordinate_variable' not in fvars[v]:
-                data=self.badctf[index]
-                fdata=self.createVariable(v,fvars[v]['type'][0],tuple(dimensions))
-                fdata[:]=data
+def btf2nc(ncfilename,source_filename=None,badctf=None):
+    ''' Convert a badc text file object to a netcdf file object.
+        Call by providing an output filename for the netcdf file,
+        and one of a source filename or a badctf instance '''
+    if source_filename is None and badctf is None:
+        raise ValueError('Arguments must include on of a source file or BADCtf instance')
+    elif source_filename is not None and badctf is not None:
+        raise ValueError('Arguments must include only ONE of a source file or BADCtf instance')
         
-    def __packtf(self):
-        ''' Used to pack a text file instance from the netcdf variables'''
-        # Need to check it's the right kind of feature type ...
-        raise NotImplementedError
+    if source_filename is not None:
+        tf=BADCtf('r',source_filename)
+    else:
+        tf=badctf
     
-    def close(self):
-        ''' Close this instance, which if mode is 'w' means writing
-        the data out to a file.'''
-        # overridden here just in case we want to do something more.
-        netcdf_file.close(self)
-
-    def convert(self):
-        ''' If data was read in .nc, write out in .csv and vice versa. 
-        '''
-        raise NotImplementedError
+    ncf=netcdf_file(ncfilename,'w')
+    
+    # file global attributes
+    for a in tf._metadata.globalRecords:
+        if len(a)==2:
+            try:
+                t=getattr(ncf,a[0])
+                t=';'.join([t,a[1][0]])
+                setattr(ncf,a[0],t)
+            except AttributeError:
+                setattr(ncf,a[0],a[1][0])
+        else: setattr(ncf,a[0],a[1:])
+        
+    fvars={}
+    # first get attributes into useful dictionary
+    for v in tf.colnames():
+        attrs=tf._metadata[('*',v)]
+        adict={}
+        for a in tf._metadata[('*',v)]:
+            adict[a[0]]=a[1]
+        fvars[v]=adict
+    # now load up the coordinate variables first
+    index=-1
+    dimensions=[]
+    # we do this loop first fora future with multiple coordinate 
+    # variables
+    for v in tf.colnames():
+        index+=1
+        if 'coordinate_variable' in fvars[v]:
+            data=tf[index]
+            dlen=len(data)
+            dim=ncf.createDimension(v,dlen)
+            dimdata=ncf.createVariable(v,fvars[v]['type'][0],(v,))
+            dimdata[:]=data
+            dimensions.append(v)
+    # now the assumption with a badc text file is that there is
+    # only one coordinate variable.
+    assert len(dimensions) == 1, "Code doesn't support multiple coordinate variables"
+    index=-1
+    for v in tf.colnames():
+        index+=1
+        if 'coordinate_variable' not in fvars[v]:
+            data=tf[index]
+            fdata=ncf.createVariable(v,fvars[v]['type'][0],tuple(dimensions))
+            fdata[:]=data
+            
+    return ncf
+   
 
 class test_btncf(unittest.TestCase):
     
     def setUp(self):
         self.data=makeBasicDummy()
-        self.dummyfile=str(uuid.uuid4())+'.csv'
-        self.data.write(self.dummyfile)
+        self.dummyfile=str(uuid.uuid4())+'.nc'
+       
         
-    def tearDown(self):
-        os.remove(self.dummyfile)
+    def NOtearDown(self):
+        if os.exists(self.dummyfile):
+            os.remove(self.dummyfile)
         
     def test_readtf(self):
-        ncf=btncf('r',self.dummyfile)
+        ncf=btf2nc(self.dummyfile,badctf=self.data)
         print ncf.variables
-        ncf.close()   # will write a netcdf version out!
+        ncf.close()  # will write a netcdf version out!
+        
+        
+class test_pupynere(unittest.TestCase):
+    ''' Worried about a pupynere writing problem '''
+    df1='dummy1.nc'
+    df2='dummy2.nc'
+    def test_pupynerefails(self):
+        f=netcdf_file(self.df1,'w')
+        f.history=('abc',)
+        f.close()
+    def test_pupynereok(self):
+        f=netcdf_file(self.df2,'w')
+        f.history='abc'
+        f.close()
+    def tearDown(self):
+        for f in [self.df1,self.df2]:
+            if os.path.exists(f): os.remove(f)
+        
+        
+        
+            
         
 if __name__=="__main__":
     unittest.main()
