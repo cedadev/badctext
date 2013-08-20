@@ -63,9 +63,7 @@ def btf2nc(ncfilename,source_filename=None,badctf=None):
             data=tf[index]
             fdata=ncf.createVariable(v,fvars[v]['type'][0],tuple(dimensions))
             fdata[:]=data
-            
     return ncf
-   
 
 class test_btncf(unittest.TestCase):
     
@@ -73,36 +71,17 @@ class test_btncf(unittest.TestCase):
         self.data=makeBasicDummy()
         self.dummyfile=str(uuid.uuid4())+'.nc'
        
-        
-    def NOtearDown(self):
-        if os.exists(self.dummyfile):
+    def tearDown(self):
+        if os.path.exists(self.dummyfile):
             os.remove(self.dummyfile)
         
     def test_readtf(self):
         ncf=btf2nc(self.dummyfile,badctf=self.data)
-        print ncf.variables
+        x=[n for n in ncf.variables]
         ncf.close()  # will write a netcdf version out!
-        
-        
-class test_pupynere(unittest.TestCase):
-    ''' Worried about a pupynere writing problem '''
-    df1='dummy1.nc'
-    df2='dummy2.nc'
-    def test_pupynerefails(self):
-        f=netcdf_file(self.df1,'w')
-        f.history=('abc',)
-        f.close()
-    def test_pupynereok(self):
-        f=netcdf_file(self.df2,'w')
-        f.history='abc'
-        f.close()
-    def tearDown(self):
-        for f in [self.df1,self.df2]:
-            if os.path.exists(f): os.remove(f)
-        
-        
-        
-            
+        n2=netcdf_file(self.dummyfile)
+        y=[n for n in n2.variables]
+        self.assertEqual(x,y)
         
 if __name__=="__main__":
     unittest.main()
