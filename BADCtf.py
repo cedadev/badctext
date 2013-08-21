@@ -439,6 +439,7 @@ class BADCtf:
         inst = ''
         for creator in self['creator']:
             c = c + creator[0] +  '; '
+            # bnl doesn't like this assumption about creator structure
             if len(creator) == 2: 
                 inst = inst +  creator[1] +  '; '
         if inst == '': inst = 'Unknown'
@@ -475,12 +476,17 @@ class BADCtf:
         header.append('0.0')
     
         # coord variable
+        cvars=[]
+        for v in self.colnames():
+            r=self._metadata[('coordinate_variable',v)]
+            if len(r)<>0: cvars.append(v)
+        assert len(cvars)>0,'No coordinate variable, cannot convert to NA!'
+        assert len(cvars)==1,'Cannot yet convert to NA (too many coordinate variables)'
+       
         # FIXME: #ASKSAM What should this look like? 
-        # coord = self['coordinate_variables'][0][0]
-        # coord = self['long_name',int(coord)][0]
-        # coord = "%s (%s)" % (coord[0], coord[1])
-        # header.append(coord)
-    
+        coord=self._metadata[('long_name',cvars[0])]
+        header.append('%s (%s)' %coord[0])
+        
         # number of variables not coord variable
         header.append("%s" % (self.nvar()-1)) 
     
@@ -507,10 +513,11 @@ class BADCtf:
         header.append(max_line)
     
         # variable names
-        for i in range(1,self.nvar()):
-            long_name = self['long_name',i][0]
-            long_name = "%s (%s)" % (long_name[0], long_name[1])
-            header.append(long_name)
+        long_names=self._metadata[('long_name','*')]
+        for name in long_names:
+            if name not in cvars:
+                long_name = "%s (%s)" % name
+                header.append(long_name)
 
         # normal comments
         header.append('1')
@@ -529,10 +536,10 @@ class BADCtf:
         # make header
         header="%s 1001\n%s" % (len(header)+nlines, string.join(header,'\n'))
 
-        # data space seperated
+        # data space separated
         data = ''
         for i in range(len(self)):
-            data = data + string.join(self._data.getrow(i)) + '\n'
+            data = data + ' '.join([str(i) for i in self._data.getrow(i)]) + '\n'
     
         return header+data
         
@@ -757,7 +764,7 @@ class testBADCtf(unittest.TestCase):
         self.t=self._makeDummy()
         
     def tearDown(self):
-        for f in [self.dummycsv,self.dummycdl,self.dummyna]:
+        for f in [self.dummycsv,self.dummycdl]:#,self.dummyna]:
             if os.path.exists(f): os.remove(f)
         
     def testMake(self):
@@ -794,8 +801,8 @@ class testBADCtf(unittest.TestCase):
         t2=BADCtf('r',self.dummycsv)
         self.assertEqual(self.t,t2)
         
-    def NOtestMakeAndWriteNA(self):
-        ''' This currently doesn't work '''
+    def testMakeAndWriteNA(self):
+        ''' test producing a NASA ames file '''
         self.t.write(self.dummyna,fmt='na')
         self.assertEqual(True,os.path.exists(self.dummyna))
         
