@@ -198,7 +198,7 @@ class BADCtf:
               "feature_type":           (1,0,1,1,0,1,checkFeatureType, 
 					"type of feature: point series, trajectory or point collection"),
               "coordinate_variable":    (0,1,0,2,1,1,checkInt, 
-					"Flag to show which colume(s) are regarded as coordinate variables"),
+					"Flag to show which column(s) are regarded as coordinate variables"),
               "Conventions":            (1,0,2,2,1,1,checkConventions, 
 					"Metadata conventions used. Must be BADC-CSV, 1"),
               "type":                   (0,1,1,1,0,2,checkAllTypes, 
@@ -346,11 +346,26 @@ class BADCtf:
                       raise BADCtfMetadataIncomplete(
                         'Basic column metadata not there: "%s" not there for %s' % (label, colname))
 
-        # if one needs to exist in a column, check that at least one exists
-        for label in ['coordinate_variable']:
+        # for metadata where one needs to exist in a column, 
+        # check that at least one exists
+        for label in ['coordinate_variable',]:
             r=self._metadata[(label,'*')]
             if r==[]: raise BADCtfMetadataIncomplete(
-                        'At least one column needs to have %s information'%label)
+                    'At least one column needs to have %s information'%label)
+    
+    def coordinate_variables(self):
+        ''' Check that the coordinate variable comes first, as required
+        by NASA Ames, and return coordinate variables '''
+        names=self.colnames()
+        firstname=names[0]
+        r=self._metadata[('coordinate_variable',firstname)]
+        if len(r)<>1:
+            raise BADCtfDataError('Need coordinate variable in first column')
+        cvars=[firstname]
+        for v in names[1:]:
+            r=self._metadata[('coordinate_variable',v)]
+            if len(r)<>0: cvars.append(v)
+        return cvars
 
     def colnames(self):
         ''' Return names of data columns '''
@@ -475,16 +490,16 @@ class BADCtf:
         # ??
         header.append('0.0')
     
-        # coord variable
-        cvars,coords=[],[]
-        for v in self.colnames():
-            r=self._metadata[('coordinate_variable',v)]
-            if len(r)<>0: cvars.append(v)
+        # 1001 independent variable, aka coordinate variable
+        coords=[]
+        cvars=self.coordinate_variables()
+       
         assert len(cvars)>0,'No coordinate variable, cannot convert to NA!'
         assert len(cvars)==1,'Cannot yet convert to NA (too many coordinate variables)'
        
         # FIXME: #ASKSAM What should this look like? 
         coord=self._metadata[('long_name',cvars[0])]
+        print cvars,coord
         coords.append(coord[0])
         header.append('%s (%s)' %coord[0])
         
@@ -531,7 +546,7 @@ class BADCtf:
         self._metadata.csv(cvswriter)
         metadata = s.getvalue()
         nlines = metadata.count('\n')
-        header.append("%s" % (nlines+2))
+        header.append("%s" % (nlines+1))
         header.append("BADC-CSV style metadata:")
         header.append(s.getvalue()) 
     
@@ -714,13 +729,13 @@ class BADCtfMetadata:
 def makeBadDummy():
     ''' Makes an incomplete invalid badc text file instance, for testing '''
     t = BADCtf()
-    d1 = (301.2, 303.4, 305.6, 305.2)
-    d2 = (1002.2, 1004.4, 1005.7, 1015.2)
-    d3 = (6,12,18,24)
-    
-    t.add_variable("temp",d1)
-    t.add_variable("press",d2)
-    t.add_variable('time',d3)
+    d1 = (6,12,18,24)
+    d2 = (301.2, 303.4, 305.6, 305.2)
+    d3 = (1002.2, 1004.4, 1005.7, 1015.2)
+   
+    t.add_variable('time',d1)
+    t.add_variable("temp",d2)
+    t.add_variable("press",d3)
     t.add_metadata('creator', 'Scrofulous Student')
     t.add_metadata('creator', ('Prof Bigshot, Hogwarts Uni'))
     return t

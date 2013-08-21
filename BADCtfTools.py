@@ -42,7 +42,7 @@ def btf2nc(ncfilename,source_filename=None,badctf=None):
     # now load up the coordinate variables first
     index=-1
     dimensions=[]
-    # we do this loop first fora future with multiple coordinate 
+    # we do this loop first for a future with multiple coordinate 
     # variables
     for v in tf.colnames():
         index+=1
@@ -55,6 +55,7 @@ def btf2nc(ncfilename,source_filename=None,badctf=None):
             dimensions.append(v)
     # now the assumption with a badc text file is that there is
     # only one coordinate variable.
+    # not necessarily true for trajectory files, but one thing at a time ...
     assert len(dimensions) == 1, "Code doesn't support multiple coordinate variables"
     index=-1
     for v in tf.colnames():
@@ -64,6 +65,8 @@ def btf2nc(ncfilename,source_filename=None,badctf=None):
             fdata=ncf.createVariable(v,fvars[v]['type'][0],tuple(dimensions))
             fdata[:]=data
     return ncf
+
+    
 
 class test_btncf(unittest.TestCase):
     
