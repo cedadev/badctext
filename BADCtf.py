@@ -781,7 +781,7 @@ class testBADCtf(unittest.TestCase):
         self.t=self._makeDummy()
         
     def tearDown(self):
-        for f in [self.dummycsv,self.dummycdl]:#,self.dummyna]:
+        for f in [self.dummycsv,self.dummycdl,self.dummyna]:
             if os.path.exists(f): os.remove(f)
         
     def testMake(self):
