@@ -442,7 +442,7 @@ class BADCtf:
             # bnl doesn't like this assumption about creator structure
             if len(creator) == 2: 
                 inst = inst +  creator[1] +  '; '
-        if inst == '': inst = 'Unknown'
+        if inst == '': inst = 'Unknown  '
         header.append(c[:-2])
         header.append(inst[:-2])
 
@@ -468,7 +468,7 @@ class BADCtf:
         date_valid = date_valid.replace('-', ' ')
         last_revised_date = self['last_revised_date']
         last_revised_date = min(last_revised_date)
-        last_revised_date = last_revised_date[0]
+        last_revised_date = last_revised_date[0][0:10]
         last_revised_date = last_revised_date.replace('-', ' ')
         header.append("%s    %s" % (date_valid, last_revised_date))
     
@@ -476,7 +476,7 @@ class BADCtf:
         header.append('0.0')
     
         # coord variable
-        cvars=[]
+        cvars,coords=[],[]
         for v in self.colnames():
             r=self._metadata[('coordinate_variable',v)]
             if len(r)<>0: cvars.append(v)
@@ -485,6 +485,7 @@ class BADCtf:
        
         # FIXME: #ASKSAM What should this look like? 
         coord=self._metadata[('long_name',cvars[0])]
+        coords.append(coord[0])
         header.append('%s (%s)' %coord[0])
         
         # number of variables not coord variable
@@ -515,7 +516,8 @@ class BADCtf:
         # variable names
         long_names=self._metadata[('long_name','*')]
         for name in long_names:
-            if name not in cvars:
+            print name,coords
+            if name not in coords:
                 long_name = "%s (%s)" % name
                 header.append(long_name)
 
@@ -735,7 +737,7 @@ def makeBasicDummy():
     t.add_metadata('type','int','time')
     t.add_metadata('coordinate_variable','1','time')
     # following are basic mandatory file metadata
-    t.add_metadata('date_valid','2013-12-01')
+    t.add_metadata('date_valid','2012-12-01')
     t.add_metadata('feature_type','point series')
     t.add_metadata('observation_station','My back yard')
     t.add_metadata('location','My back yard')
